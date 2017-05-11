@@ -234,7 +234,7 @@ macro = read.csv('macro.csv')
 macro_col_names = colnames(macro)
 macro$timestamp =  as.Date(macro$timestamp, format='%Y-%m-%d')
 #plot_line(macro, macro_col_names[1], macro_col_names[4])
-plots = lapply(macro_col_names[81:100], function(t) plot_line(macro, macro_col_names[1], t))
-multiplot(plots, cols=4)
-
+plots = lapply(macro_col_names[51:100], function(t) plot_line(macro, macro_col_names[1], t))
+multiplot(plots, cols=10)
 # end
+
