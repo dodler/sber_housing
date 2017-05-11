@@ -1,4 +1,4 @@
-setwd('/home/lyan/Documents/sber_housing/')
+setwd('C:/Users/SBT-Lyan-AI/Documents/sber_housing')
 
 library(ggplot2)
 library(reshape2)
@@ -112,9 +112,9 @@ make_xgb_predict = function(features) {
                             data.matrix(train_set[, 'price_doc']))
   xgb <- xgboost(
     data = xgb_train,
-    eta = 0.1,
-    max_depth = 300,
-    nround = 400,
+    eta = 0.9,
+    max_depth = 500,
+    nround = 100,
     subsample = 0.5,
     colsample_bytree = 0.5,
     seed = 1,
