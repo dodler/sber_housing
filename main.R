@@ -61,14 +61,15 @@ col_names_len = length(colnames(train))
 
 train[is.na(train)] = NaN
 
-sub_train = train[,col_names[1:100]]
-cor_matr = cor(sub_train[sapply(sub_train, is.numeric)])
-png(height=1200, width=1500, pointsize=15, file="overlap.png")
-corrplot(cor_matr, method='circle', number.cex=5)
+sub_train = train[,col_names[1:50]]
+corrplot(cor(sub_train[sapply(sub_train, is.numeric)]), method='circle')
+
+# macro parameters to square meter price connection
+# 
 
 # corr analysis
 
-CORR_THRES = 0.1
+CORR_THRES = 0.15
 
 filter = function(t){
   if (!is.numeric(train[,t])){
@@ -221,3 +222,19 @@ ggplot(train, aes(x=area_m, y=price_doc)) +
   geom_jitter() + ggtitle('area_m jitter')
 
 ggplot(train[train$price_doc < 60000000,], aes(x=timestamp,y=price_doc, color='red')) + geom_line() + geom_smooth(color='green')
+
+
+# macro investigation
+# here x and y are column names
+plot_line = function(data, x_col,y_col){
+  return(ggplot(data=data, aes_string(x=x_col, y=y_col)) + geom_line() + geom_smooth(colour='red') + labs(x=x_col, y=y_col))
+}
+
+macro = read.csv('macro.csv')
+macro_col_names = colnames(macro)
+macro$timestamp =  as.Date(macro$timestamp, format='%Y-%m-%d')
+#plot_line(macro, macro_col_names[1], macro_col_names[4])
+plots = lapply(macro_col_names[81:100], function(t) plot_line(macro, macro_col_names[1], t))
+multiplot(plots, cols=4)
+
+# end
