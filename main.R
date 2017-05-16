@@ -1,4 +1,4 @@
-setwd('C:/Users/SBT-Lyan-AI/Documents/sber_housing')
+setwd('/home/lyan/Documents/sber_housing')
 
 library(ggplot2)
 library(reshape2)
@@ -55,6 +55,8 @@ multiplot <- function(plots, plotlist=NULL, file, cols=1, layout=NULL) {
 
 train = read.csv('train.csv')
 test = read.csv('test.csv')
+
+train$timestamp = as.Date(train$timestamp, format='%Y-%m-%d')
 
 col_names = colnames(train)
 col_names_len = length(colnames(train))
@@ -161,8 +163,6 @@ ggplot(train, aes(x=state, y=price_doc)) + geom_jitter()
 
 price_to_all = cor(sub_train$price_doc, train[sapply(sub_train, is.numeric)])
 corrplot(price_to_all)
-
-train$timestamp = as.Date(train$timestamp, format='%Y-%m-%d')
 #format(as.Date(timestamp, format='%Y-%m-%d'), '%Y')
 
 ggplot(train, aes(x = timestamp , y = price_doc))  +
@@ -178,9 +178,12 @@ train[train$build_year < 1600] = NaN
 train[train$build_year > 2020] = NaN
 # wtf
 
-ggplot(train, aes(x=indust_part, y=price_doc)) + geom_smooth()
+get_quantiles = function(ser){
+  quant = data.frame(quantile(train$area_m, probs = c(.25, .50,.75)))
+  return(quant)
+}
 
-quant = data.frame(quantile(train$area_m, probs = c(.001, 0.15, .50,.70,.80,.90,.95, .99, .9995)))
+ggplot(train, aes(x=indust_part, y=price_doc)) + geom_smooth()
 ggplot(train, aes(x=area_m, y=price_doc)) + geom_jitter() + geom_smooth(colour='green') + 
   geom_vline(data=quant, aes(xintercept=quant, color='red'))
 
@@ -202,25 +205,6 @@ ggplot(train, aes(x=build_year, y=price_doc)) + geom_line() + geom_smooth(color=
 ggplot(train, aes(x=build_year, y=price_doc)) +
   geom_jitter() + ggtitle('build_year jitter')
 
-train[train$floor > 100,] = NaN
-ggplot(train, aes(x=floor, y=price_doc)) +
-  geom_line() + ggtitle('floor jitter') + geom_vline(data=data.frame(quant),aes(xintercept=quant, colour='blue'))
-
-ggplot(train, aes(x=water_km, y=price_doc)) +
-  geom_jitter() + ggtitle('water km jitter')
-
-ggplot(train, aes(x=metro_km_avto, y=price_doc)) +
-  geom_jitter() + ggtitle('metro km avto jitter')
-
-ggplot(train, aes(x=raion_popul, y=price_doc)) +
-  geom_jitter() + ggtitle('raion_popul jitter')
-
-ggplot(train, aes(x=ttk_km, y=price_doc)) +
-  geom_jitter() + ggtitle('ttk_km jitter')
-
-ggplot(train, aes(x=area_m, y=price_doc)) +
-  geom_jitter() + ggtitle('area_m jitter')
-
 ggplot(train[train$price_doc < 60000000,], aes(x=timestamp,y=price_doc, color='red')) + geom_line() + geom_smooth(color='green')
 
 
@@ -238,3 +222,69 @@ plots = lapply(macro_col_names[51:100], function(t) plot_line(macro, macro_col_n
 multiplot(plots, cols=10)
 # end
 
+# trying to clean up data
+library(outliers)
+
+for (n in col_names[3:col_names_len]){
+  if (is.numeric(train[,n])){
+    train[,n] = rm.outlier(train[,n], fill=TRUE)
+  }
+}
+
+# adjust build year
+
+adj_build_year = as.numeric(train$build_year)
+med_bld_year = median(adj_build_year)
+adj_build_year[adj_build_year > 2015 & adj_build_year < 1500] <- NaN
+
+train$adj_build_year = adj_build_year
+#end
+
+
+#average square meter price
+#prepare full square
+full_sq = train$full_sq
+full_sq[full_sq > 400] = median(full_sq[full_sq<400])
+
+sq_meter_price  = train$price_doc / full_sq
+sq_meter_price[sq_meter_price > 1e06] = median(sq_meter_price[sq_meter_price < 1e07])
+
+train$adj_full_sq = full_sq
+train$sq_meter_price = sq_meter_price
+# sq meter price is ready
+
+# adjusting number of room
+adj_num_room = train$num_room
+adj_num_room[adj_num_room > 10] = median(adj_num_room[adj_num_room <10])
+adj_num_room[adj_num_room < 1] = median(adj_num_room)
+train$adj_num_room = adj_num_room
+
+ggplot(train, aes(x=adj_num_room, y=sq_meter_price)) + geom_jitter()
+#end
+
+# adj kitchen
+adj_kitch_sq = train$kitch_sq
+adj_kitch_sq[adj_kitch_sq > 100] = median(adj_kitch_sq)
+train$adj_kitch_sq = adj_kitch_sq
+
+ggplot(train, aes(x=timestamp, y=adj_kitch_sq)) + geom_jitter()
+#end
+
+#adj sub area
+sub_area_factors = as.numeric(as.factor(train$sub_area))
+train$sub_area_factors = sub_area_factors
+ggplot(train, aes(x=sub_area_factors, y=sq_meter_price)) + geom_jitter()
+#end
+
+lin_reg = lm(formula = sq_meter_price ~ adj_kitch_sq+ adj_num_room + adj_full_sq + sub_area_factors + build_year, data=train)
+
+test_vars = data.frame(test$kitch_sq, test$num_room, test$full_sq, as.numeric(as.factor(test$sub_area)), test$build_year)
+colnames(test_vars) <- c('adj_kitch_sq', 'adj_num_room', 'adj_full_sq', 'sub_area_factors', 'build_year')
+
+lg_pred_sq = predict(lin_reg, test_vars)
+lg_pred_sq[is.na(lg_pred_sq)] <- median(lg_pred_sq[!is.na(lg_pred_sq)])
+lg_pred = lg_pred_sq * test$full_sq
+res = data.frame(test$id, lg_pred)
+colnames(res) = c('id', 'price_doc')
+
+write.csv(res, col.names = FALSE, row.names = FALSE, file = 'subm.csv', quote = FALSE)
