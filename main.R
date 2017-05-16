@@ -53,23 +53,58 @@ multiplot <- function(plots, plotlist=NULL, file, cols=1, layout=NULL) {
   }
 }
 
+prepare_data = function(inp){
+  res = data.frame(inp)
+  
+  res$timestamp = as.Date(res$timestamp, format='%Y-%m-%d')
+  res$sub_area_factors = as.factor(res$sub_area)
+  res = res %>%
+    group_by(sub_area) %>%
+    summarise(trc_metro = mean(trc_count_1000 / metro_min_walk),
+              trc_mkad = mean(trc_count_1000 / mkad_km),
+              trc_ts = mean(trc_count_1000 / ts_km),
+              trc_ts = mean(trc_count_1000 / ts_km),
+              m_vs_f = mean(female_f / male_f),
+              new_bld_cnt = mean(build_count_after_1995),
+              prom_grn_500 = mean(prom_part_500 / green_part_500),
+              mkad_to_sad = mean(sadovoe_km / mkad_km),
+              leisure_ratio = mean(market_shop_km * swim_pool_km * stadium_km * fitness_km),
+              prom_ratio = mean(radiation_km * oil_chemistry_km * nuclear_reactor_km * power_transmission_line_km * thermal_power_plant_km),
+              zd_ratio = mean(railroad_km * zd_vokzaly_avto_km),
+              study_ratio = mean(school_km * university_km),
+              religio_ratio = mean(church_synagogue_km * big_church_km * big_church_count_500 * church_count_500),
+              work_ratio = mean(office_sqm_3000 * office_sqm_1500 * office_sqm_1000 * office_sqm_500 * workplaces_km * office_km),
+              child_ratio = mean(preschool_km),
+              prom_grn_1500 = mean(prom_part_1500 / green_part_500)) %>%
+    right_join(res, by='sub_area')
+  
+  return(res)
+}
+
+# investigate material
+
 train = read.csv('train.csv')
 test = read.csv('test.csv')
 
-train$timestamp = as.Date(train$timestamp, format='%Y-%m-%d')
+train = prepare_data(train)
+test = prepare_data(test)
 
+# todo - remove correlated features
 col_names = colnames(train)
 col_names_len = length(colnames(train))
 
-train[is.na(train)] = NaN
+#sub_train = train[,col_names[1:50]]
+#corrplot(cor(sub_train[sapply(sub_train, is.numeric)]), method='circle')
 
-sub_train = train[,col_names[1:50]]
-corrplot(cor(sub_train[sapply(sub_train, is.numeric)]), method='circle')
+
+
+# gathering features
+
+# grouping things
+library(dplyr)
 
 # macro parameters to square meter price connection
 # 
-
-# corr analysis
 
 CORR_THRES = 0.15
 
@@ -87,8 +122,6 @@ col_names[(which(as.vector(res) == TRUE))]
 # end
 
 # high corr plot
-high_cor_feat = col_names[(which(as.vector(res) == TRUE))]
-
 plot_density = function(t){
   p = ggplot(train, aes_string(x='id', y=t)) + geom_line()
   return(p)
@@ -105,7 +138,7 @@ multiplot(plots, cols=2)
 library(xgboost)
 library(Metrics)
 make_xgb_predict = function(features) {
-  split_factor = .7
+  split_factor = .75
   
   dt = sample(nrow(train), nrow(train) * split_factor)
   train_set = train[dt,]
@@ -115,11 +148,11 @@ make_xgb_predict = function(features) {
                             data.matrix(train_set[, 'price_doc']))
   xgb <- xgboost(
     data = xgb_train,
-    eta = 0.9,
+    eta = 0.075,
     max_depth = 500,
-    nround = 100,
-    subsample = 0.5,
-    colsample_bytree = 0.5,
+    nround = 1000,
+    subsample = 0.7,
+    colsample_bytree = 0.7,
     seed = 1,
     eval_metric = "rmse",
     objective = "reg:linear",
@@ -153,9 +186,9 @@ make_xgb_predict(high_cor_feat)
 
 #xbgoost on expert selected features
 
-expert_features = c('life_sq', 'floor', 'max_floor', 'build_year', 'num_room', 'state', 'material', 'raion_popul')
-make_xgb_predict(expert_features)
-make_xgb_predict((col_names[3:col_names_len-1]))
+features = col_names[col_names != 'price_doc' & col_names != 'id' & col_names != 'timestamp']
+
+make_xgb_predict(features)
 
 # end
 
@@ -169,44 +202,10 @@ ggplot(train, aes(x = timestamp , y = price_doc))  +
   geom_line() +
   ggtitle("Price_doc density plot")
 
-ggplot(train, aes(x=floor, y=price_doc)) + geom_line() + geom_smooth(color='red') + ggtitle('floor vs price')
-ggplot(train, aes(x=fitness_km, y=price_doc)) + geom_line() + geom_smooth(color='red')
-ggplot(train, aes(x=metro_km_walk, y=price_doc)) + geom_jitter() + geom_smooth(color='red') + ggtitle('metro_walk_min')
-
-ggplot(train, aes(x=build_year, y=price_doc)) + geom_line() + geom_smooth(color='green') + ggtitle('build year vs price')
-train[train$build_year < 1600] = NaN
-train[train$build_year > 2020] = NaN
-# wtf
-
 get_quantiles = function(ser){
   quant = data.frame(quantile(train$area_m, probs = c(.25, .50,.75)))
   return(quant)
 }
-
-ggplot(train, aes(x=indust_part, y=price_doc)) + geom_smooth()
-ggplot(train, aes(x=area_m, y=price_doc)) + geom_jitter() + geom_smooth(colour='green') + 
-  geom_vline(data=quant, aes(xintercept=quant, color='red'))
-
-quant = data.frame(quantile(train$full_sq, probs = c(.001, 0.15, .50,.70,.80,.90,.95, .99, .9995)))
-ggplot(data=train, aes(x = full_sq, y = price_doc)) + 
-  geom_line() + geom_vline(data=data.frame(quant), aes(xintercept=quant, color='green'))
-
-ggplot(data=train[train$life_sq < 2000,], aes(x=life_sq, y=price_doc)) + geom_line() + 
-  geom_vline(data=data.frame(quant), aes(xintercept=quant, colour='green'))
-
-ggplot(train[train$full_sq < 240 && train$full_sq > 10,], aes(x=full_sq, y=price_doc))+ geom_jitter() + ggtitle('life square vs price')
-ggplot(train, aes(x=life_sq, y=price_doc))+ geom_jitter() + ggtitle('life square vs price')
-
-train[train$full_sq > 2000,]$full_sq = mean(train$full_sq)
-
-ggplot(train, aes(x=build_year, y=price_doc)) + geom_line() + geom_smooth(color='green') + ggtitle('build_year vs price')
-#$build_year > 1800 && train$build_year < 2200,]
-
-ggplot(train, aes(x=build_year, y=price_doc)) +
-  geom_jitter() + ggtitle('build_year jitter')
-
-ggplot(train[train$price_doc < 60000000,], aes(x=timestamp,y=price_doc, color='red')) + geom_line() + geom_smooth(color='green')
-
 
 # macro investigation
 # here x and y are column names
@@ -222,69 +221,38 @@ plots = lapply(macro_col_names[51:100], function(t) plot_line(macro, macro_col_n
 multiplot(plots, cols=10)
 # end
 
-# trying to clean up data
-library(outliers)
-
-for (n in col_names[3:col_names_len]){
-  if (is.numeric(train[,n])){
-    train[,n] = rm.outlier(train[,n], fill=TRUE)
+get_dist_index = function(x,y){
+  col_x = 1:length(unique(train$sub_area_factors))
+  col_y = 1:length(unique(train$sub_area_factors))
+  n_dist = 1:length(unique(train$sub_area_factors))
+  for(i in seq(1, length(train$sq_meter_price))){
+    col_x[train$sub_area_factors[i]] = col_x[train$sub_area_factors[i]] + train[i,x]
+    col_y[train$sub_area_factors[i]] = col_y[train$sub_area_factors[i]] + train[i,y]
+    n_dist[train$sub_area_factors[i]] = n_dist[train$sub_area_factors[i]] + 1
   }
+  
+  avg_x = col_x / n_dist
+  avg_y = col_y / n_dist
+  
+  return (avg_x / avg_y)
 }
 
-# adjust build year
+# different indexes by districts
+par(mfrow=c(3,3))
+plot(get_dist_index('price_doc','raion_popul'))
+plot(get_dist_index('price_doc','mosque_count_1000'))
+plot(get_dist_index('price_doc','bulvar_ring_km'))
+plot(get_dist_index('price_doc','fitness_km'))
+plot(get_dist_index('price_doc','industrial_km'))
+plot(get_dist_index('price_doc','mkad_km'))
+plot(get_dist_index('price_doc','water_km'))
+plot(get_dist_index('price_doc','metro_km_walk'))
+plot(get_dist_index('price_doc','university_km'))
 
-adj_build_year = as.numeric(train$build_year)
-med_bld_year = median(adj_build_year)
-adj_build_year[adj_build_year > 2015 & adj_build_year < 1500] <- NaN
+library(outliers)
 
-train$adj_build_year = adj_build_year
-#end
-
-
-#average square meter price
-#prepare full square
-full_sq = train$full_sq
-full_sq[full_sq > 400] = median(full_sq[full_sq<400])
-
-sq_meter_price  = train$price_doc / full_sq
-sq_meter_price[sq_meter_price > 1e06] = median(sq_meter_price[sq_meter_price < 1e07])
-
-train$adj_full_sq = full_sq
-train$sq_meter_price = sq_meter_price
-# sq meter price is ready
-
-# adjusting number of room
-adj_num_room = train$num_room
-adj_num_room[adj_num_room > 10] = median(adj_num_room[adj_num_room <10])
-adj_num_room[adj_num_room < 1] = median(adj_num_room)
-train$adj_num_room = adj_num_room
-
-ggplot(train, aes(x=adj_num_room, y=sq_meter_price)) + geom_jitter()
-#end
-
-# adj kitchen
-adj_kitch_sq = train$kitch_sq
-adj_kitch_sq[adj_kitch_sq > 100] = median(adj_kitch_sq)
-train$adj_kitch_sq = adj_kitch_sq
-
-ggplot(train, aes(x=timestamp, y=adj_kitch_sq)) + geom_jitter()
-#end
-
-#adj sub area
-sub_area_factors = as.numeric(as.factor(train$sub_area))
-train$sub_area_factors = sub_area_factors
-ggplot(train, aes(x=sub_area_factors, y=sq_meter_price)) + geom_jitter()
-#end
-
-lin_reg = lm(formula = sq_meter_price ~ adj_kitch_sq+ adj_num_room + adj_full_sq + sub_area_factors + build_year, data=train)
-
-test_vars = data.frame(test$kitch_sq, test$num_room, test$full_sq, as.numeric(as.factor(test$sub_area)), test$build_year)
-colnames(test_vars) <- c('adj_kitch_sq', 'adj_num_room', 'adj_full_sq', 'sub_area_factors', 'build_year')
-
-lg_pred_sq = predict(lin_reg, test_vars)
-lg_pred_sq[is.na(lg_pred_sq)] <- median(lg_pred_sq[!is.na(lg_pred_sq)])
-lg_pred = lg_pred_sq * test$full_sq
-res = data.frame(test$id, lg_pred)
-colnames(res) = c('id', 'price_doc')
-
-write.csv(res, col.names = FALSE, row.names = FALSE, file = 'subm.csv', quote = FALSE)
+for(n in col_names[2:col_names_len-1]){
+  if(is.numeric(train[,n])){
+    train[,n] = rm.outlier(train[,n], fill = TRUE)
+  }
+}
