@@ -1,8 +1,7 @@
-setwd('/home/lyan/Documents/sber_housing')
+setwd('C:/Users/SBT-Lyan-AI/Documents/sber_housing')
 
 library(ggplot2)
 library(reshape2)
-library(corrgram)
 library(corrplot)
 library(dplyr)
 
@@ -68,15 +67,21 @@ prepare_data = function(inp){
               new_bld_cnt = mean(build_count_after_1995),
               prom_grn_500 = mean(prom_part_500 / green_part_500),
               mkad_to_sad = mean(sadovoe_km / mkad_km),
-              leisure_ratio = mean(market_shop_km * swim_pool_km * stadium_km * fitness_km),
-              prom_ratio = mean(radiation_km * oil_chemistry_km * nuclear_reactor_km * power_transmission_line_km * thermal_power_plant_km),
-              zd_ratio = mean(railroad_km * zd_vokzaly_avto_km),
-              study_ratio = mean(school_km * university_km),
-              religio_ratio = mean(church_synagogue_km * big_church_km * big_church_count_500 * church_count_500),
-              work_ratio = mean(office_sqm_3000 * office_sqm_1500 * office_sqm_1000 * office_sqm_500 * workplaces_km * office_km),
               child_ratio = mean(preschool_km),
-              prom_grn_1500 = mean(prom_part_1500 / green_part_500)) %>%
+              prom_grn_1500 = mean(prom_part_1500 / green_part_500),
+              young_to_work = mean(young_all / work_all),
+              young_to_old = mean(young_all / ekder_all),
+              work_to_ekder = mean(work_all / ekder_all)
+              ) %>%
     right_join(res, by='sub_area')
+  
+  #
+  #leisure_ratio = mean(market_shop_km * swim_pool_km * stadium_km * fitness_km),
+  #prom_ratio = mean(radiation_km * oil_chemistry_km * nuclear_reactor_km * power_transmission_line_km * thermal_power_plant_km),
+  #zd_ratio = mean(railroad_km * zd_vokzaly_avto_km),
+  #study_ratio = mean(school_km * university_km),
+  #religio_ratio = mean(church_synagogue_km * big_church_km * big_church_count_500 * church_count_500),
+  #work_ratio = mean(office_sqm_3000 * office_sqm_1500 * office_sqm_1000 * office_sqm_500 * workplaces_km * office_km),
   
   return(res)
 }
@@ -89,22 +94,62 @@ test = read.csv('test.csv')
 train = prepare_data(train)
 test = prepare_data(test)
 
-# todo - remove correlated features
+# price district ratios
+
+
+train = train %>%
+  group_by(sub_area) %>%
+  summarise(dist_sq_prc = mean(price_doc / full_sq),
+            dist_sq_prc_to_metro_km = mean(dist_sq_prc / metro_min_walk),
+            dist_sq_prc_to_kremlin = mean(dist_sq_prc / kremlin_km),
+            dist_sq_prc_to_mkad_km = mean(dist_sq_prc / mkad_km),
+            dist_sq_prc_to_sad = mean(dist_sq_prc / sadovoe_km),
+            dist_sq_prc_to_cmtr = mean(dist_sq_prc / cemetery_km),
+            dist_sq_prc_to_water = mean(dist_sq_prc / water_km),
+            dist_sq_prc_to_railroad =mean(dist_sq_prc / railroad_km),
+            dist_sq_prc_to_statio = mean(dist_sq_prc / railroad_station_avto_km)
+            ) %>%
+  right_join(train, by='sub_area')
+
+test = train %>%
+  group_by(sub_area) %>%
+  summarise(dist_sq_prc = mean(price_doc / full_sq),
+            dist_sq_prc_to_metro_km = mean(dist_sq_prc / metro_min_walk),
+            dist_sq_prc_to_kremlin = mean(dist_sq_prc / kremlin_km),
+            dist_sq_prc_to_mkad_km = mean(dist_sq_prc / mkad_km),
+            dist_sq_prc_to_sad = mean(dist_sq_prc / sadovoe_km),
+            dist_sq_prc_to_cmtr = mean(dist_sq_prc / cemetery_km),
+            dist_sq_prc_to_water = mean(dist_sq_prc / water_km),
+            dist_sq_prc_to_railroad =mean(dist_sq_prc / railroad_km),
+            dist_sq_prc_to_statio = mean(dist_sq_prc / railroad_station_avto_km)
+            ) %>%
+  right_join(test, by='sub_area')
+#end
+
+library(caret)
+nums = sapply(train, is.numeric)
+cor_mtr = cor(train[,nums])
+cor_mtr[is.nan(cor_mtr)] <- 0
+cor_mtr[is.na(cor_mtr)] <- 0
+high_corr = findCorrelation(cor_mtr)
+train = train[,-high_corr]
+test = test[,-high_corr]
+
+
+# moving high corr features
+
+#end
+
 col_names = colnames(train)
 col_names_len = length(colnames(train))
+
+features = col_names[col_names != 'price_doc' & col_names != 'id' & col_names != 'timestamp']
+
+make_xgb_predict(features)
 
 #sub_train = train[,col_names[1:50]]
 #corrplot(cor(sub_train[sapply(sub_train, is.numeric)]), method='circle')
 
-
-
-# gathering features
-
-# grouping things
-library(dplyr)
-
-# macro parameters to square meter price connection
-# 
 
 CORR_THRES = 0.15
 
@@ -137,6 +182,7 @@ multiplot(plots, cols=2)
 
 library(xgboost)
 library(Metrics)
+library(DiagrammeR)
 make_xgb_predict = function(features) {
   split_factor = .75
   
@@ -149,8 +195,8 @@ make_xgb_predict = function(features) {
   xgb <- xgboost(
     data = xgb_train,
     eta = 0.075,
-    max_depth = 500,
-    nround = 1000,
+    max_depth = 700,
+    nround = 500,
     subsample = 0.7,
     colsample_bytree = 0.7,
     seed = 1,
@@ -158,6 +204,8 @@ make_xgb_predict = function(features) {
     objective = "reg:linear",
     nthread = 4
   )
+  
+  #xgb.plot.tree(feature_names = features, model=xgb)
   
   eval_test = xgb.DMatrix(data = data.matrix(sapply(test_set[, features], as.numeric)))
   eval_labels = abs(predict(xgb, eval_test))
@@ -183,12 +231,6 @@ make_xgb_predict = function(features) {
 
 make_xgb_predict(high_cor_feat)
 #end
-
-#xbgoost on expert selected features
-
-features = col_names[col_names != 'price_doc' & col_names != 'id' & col_names != 'timestamp']
-
-make_xgb_predict(features)
 
 # end
 
