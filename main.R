@@ -30,7 +30,7 @@ multiplot <- function(plots, plotlist=NULL, file, cols=1, layout=NULL) {
     # ncol: Number of columns of plots
     # nrow: Number of rows needed, calculated from # of cols
     layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                     ncol = cols, nrow = ceiling(numPlots/cols))
+    ncol = cols, nrow = ceiling(numPlots/cols))
   }
   
   if (numPlots==1) {
@@ -47,7 +47,7 @@ multiplot <- function(plots, plotlist=NULL, file, cols=1, layout=NULL) {
       matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
       
       print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
+    layout.pos.col = matchidx$col))
     }
   }
 }
@@ -143,7 +143,7 @@ test = test[,-high_corr]
 col_names = colnames(train)
 col_names_len = length(colnames(train))
 
-features = col_names[col_names != 'price_doc' & col_names != 'id' & col_names != 'timestamp']
+features = col_names[col_names != 'price_doc' & col_names != 'id']
 
 make_xgb_predict(features)
 
@@ -191,12 +191,12 @@ make_xgb_predict = function(features) {
   test_set = train[-dt,]
   
   xgb_train = xgb.DMatrix(data = data.matrix(sapply(train_set[, features], as.numeric)), label =
-                            data.matrix(train_set[, 'price_doc']))
+           data.matrix(train_set[, 'price_doc']))
   xgb <- xgboost(
     data = xgb_train,
-    eta = 0.075,
-    max_depth = 700,
-    nround = 500,
+    eta = 0.0075,
+    max_depth = 350,
+    nround = 350,
     subsample = 0.7,
     colsample_bytree = 0.7,
     seed = 1,
@@ -298,3 +298,29 @@ for(n in col_names[2:col_names_len-1]){
     train[,n] = rm.outlier(train[,n], fill = TRUE)
   }
 }
+
+# vars collections
+demo_vars <- c('area_m', 'raion_popul', 'full_all', 'male_f', 'female_f', 'young_all', 
+               'young_female', 'work_all', 'work_male', 'work_female', 'price_doc')
+
+internal_chars <- c('full_sq', 'life_sq', 'floor', 'max_floor', 'build_year', 'num_room', 
+   'kitch_sq', 'state', 'price_doc')
+
+school_chars <- c('children_preschool', 'preschool_quota', 'preschool_education_centers_raion',
+ 'children_school', 'school_quota', 'school_education_centers_raion', 
+ 'school_education_centers_top_20_raion', 'university_top_20_raion',
+ 'additional_education_raion', 'additional_education_km', 'university_km',
+ 'price_doc')
+
+cult_chars <- c('sport_objects_raion', 'culture_objects_top_25_raion', 'shopping_centers_raion',
+                'park_km', 'fitness_km', 'swim_pool_km', 'ice_rink_km','stadium_km', 'basketball_km', 
+                'shopping_centers_km', 'big_church_km','church_synagogue_km', 'mosque_km', 'theater_km',
+                'museum_km', 'exhibition_km', 'catering_km', 'price_doc')
+
+inf_features <- c('nuclear_reactor_km', 'thermal_power_plant_km', 'power_transmission_line_km',
+                  'incineration_km','water_treatment_km', 'incineration_km', 'railroad_station_walk_km',
+                  'railroad_station_walk_min', 'railroad_station_avto_km', 'railroad_station_avto_min',
+                  'public_transport_station_km', 'public_transport_station_min_walk', 'water_km',
+                  'mkad_km', 'ttk_km', 'sadovoe_km','bulvar_ring_km', 'kremlin_km', 'price_doc')
+
+# 1 - panel, 2 - brick, 3 - wood, 4 - mass concrete, 5 - breezeblock, 6 - mass concrete plus brick
