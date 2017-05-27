@@ -81,6 +81,11 @@ inf_features <- c('nuclear_reactor_km', 'thermal_power_plant_km', 'power_transmi
 
 #end
 
+one_hot_encoding = function(feature){
+  levels = length(unique(feature))
+  res = data.frame()
+}
+
 area_use_ratio = train$life_sq / train$full_sq
 year_old = 2017 - train$build_year
 living_area_per_room = train$life_sq / train$num_room
@@ -89,8 +94,24 @@ house_res_pos = train$floor / train$max_floor
 popul_density = train$raion_popul / train$area_m
 avg_dist= (train$ttk_km + train$sadovoe_km + train$mkad_km + train$bulvar_ring_km + train$kremlin_km) / 5
 
+caffee_1000_avg_prc = (train$cafe_count_1000_price_1000 + train$cafe_count_1000_price_2500 + 
+                train$cafe_count_1000_price_4000 + train$cafe_count_1000_price_high) / 4
+
+caffee_1500_avg_prc = (train$cafe_count_1500_price_1000 + train$cafe_count_1500_price_2500 + 
+                         train$cafe_count_1500_price_4000 + train$cafe_count_1500_price_high) / 4
+
+caffee_2000_avg_prc = (train$cafe_count_2000_price_1000 + train$cafe_count_2000_price_2500 + 
+                         train$cafe_count_2000_price_4000 + train$cafe_count_2000_price_high) / 4
+caffee_3000_avg_prc = (train$cafe_count_3000_price_1000 + train$cafe_count_3000_price_2500 + 
+                         train$cafe_count_3000_price_4000 + train$cafe_count_3000_price_high) / 4
+caffee_5000_avg_prc = (train$cafe_count_5000_price_1000 + train$cafe_count_5000_price_2500 + 
+                         train$cafe_count_5000_price_4000 + train$cafe_count_5000_price_high) / 4
+
+
 train = data.frame(cbind(train,area_use_ratio,year_old,living_area_per_room,
-                         popul_density, kitch_rel_size, house_res_pos, avg_dist))
+                         popul_density, kitch_rel_size, house_res_pos, avg_dist,
+                         caffee_1000_avg_prc, caffee_1500_avg_prc,caffee_2000_avg_prc,
+                         caffee_3000_avg_prc,caffee_5000_avg_prc))
 
 area_use_ratio = test$life_sq / test$full_sq
 year_old = 2017 - test$build_year
@@ -100,9 +121,39 @@ house_res_pos = test$floor / test$max_floor
 popul_density = test$raion_popul / test$area_m
 avg_dist= (test$ttk_km + test$sadovoe_km + test$mkad_km + test$bulvar_ring_km + test$kremlin_km) / 5
 
+caffee_1000_avg_prc = (test$cafe_count_1000_price_1000 + test$cafe_count_1000_price_2500 + 
+                         test$cafe_count_1000_price_4000 + test$cafe_count_1000_price_high) / 4
+caffee_1500_avg_prc = (test$cafe_count_1500_price_1000 + test$cafe_count_1500_price_2500 + 
+                         test$cafe_count_1500_price_4000 + test$cafe_count_1500_price_high) / 4
+caffee_2000_avg_prc = (test$cafe_count_2000_price_1000 + test$cafe_count_2000_price_2500 + 
+                         test$cafe_count_2000_price_4000 + test$cafe_count_2000_price_high) / 4
+caffee_3000_avg_prc = (test$cafe_count_3000_price_1000 + test$cafe_count_3000_price_2500 + 
+                         test$cafe_count_3000_price_4000 + test$cafe_count_3000_price_high) / 4
+caffee_5000_avg_prc = (test$cafe_count_5000_price_1000 + test$cafe_count_5000_price_2500 + 
+                         test$cafe_count_5000_price_4000 + test$cafe_count_5000_price_high) / 4
+
+
 test = data.frame(cbind(test, area_use_ratio, year_old, living_area_per_room,
-                        popul_density, kitch_rel_size, house_res_pos, avg_dist))
+                        popul_density, kitch_rel_size, house_res_pos, avg_dist,
+                        caffee_1000_avg_prc, caffee_1500_avg_prc,caffee_2000_avg_prc,
+                        caffee_3000_avg_prc,caffee_5000_avg_prc))
 # remove correlated features
+
+train = subset(train,select = -c(cafe_count_1000_price_1000,cafe_count_1000_price_2500, cafe_count_1000_price_4000,
+                  cafe_count_1000_price_high,cafe_count_1500_price_1000,cafe_count_1500_price_2500,
+                  cafe_count_1500_price_4000 ,cafe_count_1500_price_high,cafe_count_2000_price_1000,
+                  cafe_count_2000_price_2500,cafe_count_2000_price_4000,cafe_count_2000_price_high,
+                  cafe_count_3000_price_1000,cafe_count_3000_price_2500,cafe_count_3000_price_4000,
+                  cafe_count_3000_price_high,cafe_count_5000_price_1000,cafe_count_5000_price_2500,
+                  cafe_count_5000_price_4000,cafe_count_5000_price_high))
+
+test = subset(test,select = -c(cafe_count_1000_price_1000,cafe_count_1000_price_2500, cafe_count_1000_price_4000,
+                cafe_count_1000_price_high,cafe_count_1500_price_1000,cafe_count_1500_price_2500,
+                cafe_count_1500_price_4000 ,cafe_count_1500_price_high,cafe_count_2000_price_1000,
+                cafe_count_2000_price_2500,cafe_count_2000_price_4000,cafe_count_2000_price_high,
+                cafe_count_3000_price_1000,cafe_count_3000_price_2500,cafe_count_3000_price_4000,
+                cafe_count_3000_price_high,cafe_count_5000_price_1000,cafe_count_5000_price_2500,
+                cafe_count_5000_price_4000,cafe_count_5000_price_high))
 
 
 library(caret)
@@ -113,12 +164,10 @@ cor_mtr[is.na(cor_mtr)] <- 0
 high_corr = findCorrelation(cor_mtr)
 train = train[,-high_corr]
 test = test[,-high_corr]
-
 # end
 
 
 #
-
 
 id_test = test$id
 
@@ -170,7 +219,7 @@ xgb_params = list(
 #             maximize=F)
 
 #best_nrounds = res$best_iteration
-best_nrounds = 1450
+best_nrounds = 145
 
 gbdt = xgb.train(xgb_params, dtrain, best_nrounds)
 

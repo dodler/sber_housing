@@ -1,4 +1,4 @@
-setwd('C:/Users/SBT-Lyan-AI/Documents/sber_housing')
+setwd('/home/lyan//Documents/sber_housing')
 
 library(ggplot2)
 library(reshape2)
